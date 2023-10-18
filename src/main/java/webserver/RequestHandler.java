@@ -35,7 +35,6 @@ public class RequestHandler extends Thread {
                 connection.getPort());
 
         try (InputStream in = connection.getInputStream(); OutputStream out = connection.getOutputStream()) {
-            // TODO 사용자 요청에 대한 처리는 이 곳에 구현하면 된다.
             BufferedReader br = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
             String line = br.readLine();
             log.debug("first line : {}", line);
@@ -87,7 +86,7 @@ public class RequestHandler extends Thread {
                 int idx = cookie.indexOf(" ");
                 Map<String, String> cookieMap = HttpRequestUtils.parseCookies(cookie.substring(idx + 1));
                 boolean logined = Boolean.parseBoolean(cookieMap.get("logined"));
-                if(logined) {
+                if (logined) {
                     StringBuilder sb = new StringBuilder();
                     List<User> userList = DataBase.findAll().stream().collect(Collectors.toList());
                     sb.append("<table>");
@@ -95,11 +94,15 @@ public class RequestHandler extends Thread {
                     sb.append("</table>");
 
                     String body = sb.toString();
-                    response200Header(dos, body.length());
+                    response200Header(dos, body.length(), "text/html");
                     responseBody(dos, body.getBytes());
+
                 } else {
                     response200(dos, "/index.html"); //TODO 코드값
                 }
+            } else if(url.endsWith(".css")) {
+                log.debug("request css : {}", url);
+                response200(dos, url);
             } else {
                 response200(dos, url);
             }
@@ -111,14 +114,14 @@ public class RequestHandler extends Thread {
 
     private void response200(DataOutputStream dos, String url) throws IOException {
         byte[] body = Files.readAllBytes(new File("./webapp" + url).toPath());
-        response200Header(dos, body.length);
+        response200Header(dos, body.length, url.endsWith(".html") ? "text/html" : "text/css");
         responseBody(dos, body);
     }
 
-    private void response200Header(DataOutputStream dos, int lengthOfBodyContent) {
+    private void response200Header(DataOutputStream dos, int lengthOfBodyContent, String contentType) {
         try {
             dos.writeBytes("HTTP/1.1 200 OK \r\n");
-            dos.writeBytes("Content-Type: text/html;charset=utf-8\r\n");
+            dos.writeBytes("Content-Type: "+contentType+";charset=utf-8\r\n");
             dos.writeBytes("Content-Length: " + lengthOfBodyContent + "\r\n");
             dos.writeBytes("\r\n");
         } catch (IOException e) {
