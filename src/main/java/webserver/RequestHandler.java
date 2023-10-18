@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Map;
 
+import db.DataBase;
 import model.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,11 +58,23 @@ public class RequestHandler extends Thread {
             if(url.startsWith("/user/create")) {
                 String body = IOUtils.readData(br, contentLength);
                 Map<String, String> userMap = HttpRequestUtils.parseQueryString(body);
+
                 User user = new User(userMap.get("userId"), userMap.get("password"), userMap.get("name"), userMap.get("email"));
+                DataBase.addUser(user);
 
                 log.debug("User : {}", user);
-
                 response302Header(dos);
+            } else if(url.startsWith("/user/login")) {
+                String body = IOUtils.readData(br, contentLength);
+                Map<String, String> userMap = HttpRequestUtils.parseQueryString(body);
+
+                User user = DataBase.findUserById(userMap.get("userId"));
+                if (user == null || user.getPassword().equals(userMap.get("password"))) {
+                    responseLoginFail(dos);
+                } else {
+                    responseLoginSuccessHeader(dos);
+                    response200(dos, "/index.html");
+                }
             } else {
                 response200(dos, url);
             }
@@ -110,5 +123,32 @@ public class RequestHandler extends Thread {
     private int getContentLength(String line) {
         String[] tokens = line.split(":");
         return Integer.parseInt(tokens[1].trim());
+    }
+
+    private void responseLoginSuccessHeader(DataOutputStream dos) {
+        try{
+            dos.writeBytes("HTTP/1.1 200 OK \r\n");
+            dos.writeBytes("Content-Type: text/html;charset=utf-8\r\n");
+            dos.writeBytes("Set-Cookie: logined=true");
+            dos.writeBytes("\r\n");
+        }catch (IOException e) {
+            log.error(e.getMessage());
+        }
+    }
+
+    private void responseLoginFail(DataOutputStream dos) throws IOException {
+        byte[] body = Files.readAllBytes(new File("./webapp/user/login_failed.html").toPath());
+        response401Header(dos);
+        responseBody(dos, body);
+    }
+    private void response401Header(DataOutputStream dos) {
+        try{
+            dos.writeBytes("HTTP/1.1 401 Unauthorized\r\n");
+            dos.writeBytes("Content-Type: text/html;charset=utf-8\r\n");
+            dos.writeBytes("Set-Cookie: logined=false");
+            dos.writeBytes("\r\n");
+        }catch (IOException e) {
+            log.error(e.getMessage());
+        }
     }
 }
