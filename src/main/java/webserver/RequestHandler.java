@@ -10,6 +10,7 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -46,23 +47,17 @@ public class RequestHandler extends Thread {
             String[] tokens = line.split(" ");
 
             String url = tokens[1];
-            int contentLength = 0;
-            String cookie = "";
-            while(!"".equals(line)) {
+            Map<String, String> headerMap = new HashMap<>();
+            while(!"".equals(line = br.readLine())) {
                 log.debug("{}", line);
-                line = br.readLine();
-                if(line.startsWith("Content-Length")) {
-                    contentLength = getContentLength(line);
-                }
 
-                if(line.startsWith("Cookie")) {
-                    cookie = line;
-                }
+                String[] headerTokens = line.split(": ");
+                headerMap.put(headerTokens[0], headerTokens[1]);
             }
 
             DataOutputStream dos = new DataOutputStream(out);
-            if(url.startsWith("/user/create")) {
-                String body = IOUtils.readData(br, contentLength);
+            if(url.startsWith("/user/create") && !url.endsWith(".html")) {
+                String body = IOUtils.readData(br, Integer.parseInt(headerMap.get("Content-Length")));
                 Map<String, String> userMap = HttpRequestUtils.parseQueryString(body);
 
                 User user = new User(userMap.get("userId"), userMap.get("password"), userMap.get("name"), userMap.get("email"));
@@ -70,21 +65,18 @@ public class RequestHandler extends Thread {
 
                 log.debug("User : {}", user);
                 response302Header(dos);
-            } else if(url.startsWith("/user/login")) {
-                String body = IOUtils.readData(br, contentLength);
+            } else if(url.startsWith("/user/login") && !url.endsWith(".html")) {
+                String body = IOUtils.readData(br, Integer.parseInt(headerMap.get("Content-Length")));
                 Map<String, String> userMap = HttpRequestUtils.parseQueryString(body);
 
                 User user = DataBase.findUserById(userMap.get("userId"));
                 if (user == null || !user.getPassword().equals(userMap.get("password"))) {
                     responseLoginFail(dos);
                 } else {
-                    responseLoginSuccessHeader(dos);
-                    response200(dos, "/index.html"); //TODO 코드값
+                    response302HeaderWithCookie(dos, "logined=true");
                 }
-            } else if(url.startsWith("/user/list")) {
-                log.debug("String Cookie : {}", cookie);
-                int idx = cookie.indexOf(" ");
-                Map<String, String> cookieMap = HttpRequestUtils.parseCookies(cookie.substring(idx + 1));
+            } else if(url.startsWith("/user/list") && !url.endsWith(".html")) {
+                Map<String, String> cookieMap = HttpRequestUtils.parseCookies(headerMap.get("Cookie"));
                 boolean logined = Boolean.parseBoolean(cookieMap.get("logined"));
                 if (logined) {
                     StringBuilder sb = new StringBuilder();
@@ -94,17 +86,20 @@ public class RequestHandler extends Thread {
                     sb.append("</table>");
 
                     String body = sb.toString();
-                    response200Header(dos, body.length(), "text/html");
+                    response200Header(dos, body.length());
                     responseBody(dos, body.getBytes());
-
                 } else {
-                    response200(dos, "/index.html"); //TODO 코드값
+                    response302Header(dos);
                 }
             } else if(url.endsWith(".css")) {
                 log.debug("request css : {}", url);
-                response200(dos, url);
+                byte[] body = Files.readAllBytes(new File("./webapp" + url).toPath());
+                response200HeaderWithCss(dos, body.length);
+                responseBody(dos, body);
             } else {
-                response200(dos, url);
+                byte[] body = Files.readAllBytes(new File("./webapp" + url).toPath());
+                response200Header(dos, body.length);
+                responseBody(dos, body);
             }
 
         } catch (IOException e) {
@@ -112,16 +107,21 @@ public class RequestHandler extends Thread {
         }
     }
 
-    private void response200(DataOutputStream dos, String url) throws IOException {
-        byte[] body = Files.readAllBytes(new File("./webapp" + url).toPath());
-        response200Header(dos, body.length, url.endsWith(".html") ? "text/html" : "text/css");
-        responseBody(dos, body);
-    }
-
-    private void response200Header(DataOutputStream dos, int lengthOfBodyContent, String contentType) {
+    private void response200Header(DataOutputStream dos, int lengthOfBodyContent) {
         try {
             dos.writeBytes("HTTP/1.1 200 OK \r\n");
-            dos.writeBytes("Content-Type: "+contentType+";charset=utf-8\r\n");
+            dos.writeBytes("Content-Type: text/html;charset=utf-8\r\n");
+            dos.writeBytes("Content-Length: " + lengthOfBodyContent + "\r\n");
+            dos.writeBytes("\r\n");
+        } catch (IOException e) {
+            log.error(e.getMessage());
+        }
+    }
+
+    private void response200HeaderWithCss(DataOutputStream dos, int lengthOfBodyContent) {
+        try {
+            dos.writeBytes("HTTP/1.1 200 OK \r\n");
+            dos.writeBytes("Content-Type: text/css;charset=utf-8\r\n");
             dos.writeBytes("Content-Length: " + lengthOfBodyContent + "\r\n");
             dos.writeBytes("\r\n");
         } catch (IOException e) {
@@ -148,16 +148,11 @@ public class RequestHandler extends Thread {
         }
     }
 
-    private int getContentLength(String line) {
-        String[] tokens = line.split(":");
-        return Integer.parseInt(tokens[1].trim());
-    }
-
-    private void responseLoginSuccessHeader(DataOutputStream dos) {
+    private void response302HeaderWithCookie(DataOutputStream dos, String cookie) {
         try{
-            dos.writeBytes("HTTP/1.1 200 OK \r\n");
-            dos.writeBytes("Content-Type: text/html;charset=utf-8\r\n");
-            dos.writeBytes("Set-Cookie: logined=true");
+            dos.writeBytes("HTTP/1.1 302 OK \r\n");
+            dos.writeBytes("Location: /index.html \r\n");
+            dos.writeBytes("Set-Cookie: " + cookie + "\r\n");
             dos.writeBytes("\r\n");
         }catch (IOException e) {
             log.error(e.getMessage());
