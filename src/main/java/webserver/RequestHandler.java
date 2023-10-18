@@ -9,9 +9,12 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.file.Files;
+import java.util.Map;
 
+import model.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import util.HttpRequestUtils;
 
 public class RequestHandler extends Thread {
     private static final Logger log = LoggerFactory.getLogger(RequestHandler.class);
@@ -30,22 +33,40 @@ public class RequestHandler extends Thread {
             // TODO 사용자 요청에 대한 처리는 이 곳에 구현하면 된다.
             BufferedReader br = new BufferedReader(new InputStreamReader(in));
             String line = br.readLine();
-            String url = "";
-            while(!"".equals(line)) {
-                if(line == null) return;
+            log.debug("first line : {}", line);
 
-                String[] str = line.split(" ");
-                url = str[1];
-                break;
+            if(line == null) {
+                return;
             }
 
-            DataOutputStream dos = new DataOutputStream(out);
-            byte[] body = Files.readAllBytes(new File("./webapp" + url).toPath());
-            response200Header(dos, body.length);
-            responseBody(dos, body);
+            String[] tokens = line.split(" ");
+
+            String url = tokens[1];
+            while(!"".equals(line)) {
+                log.debug("{}", line);
+                line = br.readLine();
+            }
+
+            if(url.startsWith("/user/create")) {
+                int idx = url.indexOf("?");
+                String params = url.substring(idx + 1);
+                Map<String, String> userMap = HttpRequestUtils.parseQueryString(params);
+                User user = new User(userMap.get("userId"), userMap.get("password"), userMap.get("name"), userMap.get("email"));
+                log.debug("User : {}", user);
+            } else {
+                response200(out, url);
+            }
+
         } catch (IOException e) {
             log.error(e.getMessage());
         }
+    }
+
+    private void response200(OutputStream out, String url) throws IOException {
+        DataOutputStream dos = new DataOutputStream(out);
+        byte[] body = Files.readAllBytes(new File("./webapp" + url).toPath());
+        response200Header(dos, body.length);
+        responseBody(dos, body);
     }
 
     private void response200Header(DataOutputStream dos, int lengthOfBodyContent) {
