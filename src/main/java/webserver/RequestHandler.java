@@ -10,7 +10,9 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import db.DataBase;
 import model.User;
@@ -46,11 +48,16 @@ public class RequestHandler extends Thread {
 
             String url = tokens[1];
             int contentLength = 0;
+            String cookie = "";
             while(!"".equals(line)) {
                 log.debug("{}", line);
                 line = br.readLine();
                 if(line.startsWith("Content-Length")) {
                     contentLength = getContentLength(line);
+                }
+
+                if(line.startsWith("Cookie")) {
+                    cookie = line;
                 }
             }
 
@@ -69,11 +76,29 @@ public class RequestHandler extends Thread {
                 Map<String, String> userMap = HttpRequestUtils.parseQueryString(body);
 
                 User user = DataBase.findUserById(userMap.get("userId"));
-                if (user == null || user.getPassword().equals(userMap.get("password"))) {
+                if (user == null || !user.getPassword().equals(userMap.get("password"))) {
                     responseLoginFail(dos);
                 } else {
                     responseLoginSuccessHeader(dos);
-                    response200(dos, "/index.html");
+                    response200(dos, "/index.html"); //TODO 코드값
+                }
+            } else if(url.startsWith("/user/list")) {
+                log.debug("String Cookie : {}", cookie);
+                int idx = cookie.indexOf(" ");
+                Map<String, String> cookieMap = HttpRequestUtils.parseCookies(cookie.substring(idx + 1));
+                boolean logined = Boolean.parseBoolean(cookieMap.get("logined"));
+                if(logined) {
+                    StringBuilder sb = new StringBuilder();
+                    List<User> userList = DataBase.findAll().stream().collect(Collectors.toList());
+                    sb.append("<table>");
+                    userList.forEach(user -> sb.append("<tr><td>" + user.getName() + "<td></tr>"));
+                    sb.append("</table>");
+
+                    String body = sb.toString();
+                    response200Header(dos, body.length());
+                    responseBody(dos, body.getBytes());
+                } else {
+                    response200(dos, "/index.html"); //TODO 코드값
                 }
             } else {
                 response200(dos, url);
