@@ -82,7 +82,7 @@ public class HttpResponse {
         }
     }
 
-    public void processHeaders() {
+    private void processHeaders() {
         try {
             Set<String> keySet = headers.keySet();
             for (String key : keySet) {
