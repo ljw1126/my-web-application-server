@@ -32,7 +32,7 @@ public class HttpRequest {
             while (!"".equals(line = br.readLine())) {
                 if (line == null) break;
 
-                String[] headerTokens = line.split(": ");
+                String[] headerTokens = line.split(":");
                 header.put(headerTokens[0].trim(), headerTokens[1].trim());
             }
 
