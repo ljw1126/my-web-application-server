@@ -14,49 +14,45 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class HttpRequest {
-    Logger log = LoggerFactory.getLogger(HttpRequest.class);
+    private static final Logger log = LoggerFactory.getLogger(HttpRequest.class);
 
     private static Map<String, String> header = new HashMap<>();
     private static Map<String, String> parameter = new HashMap<>();
 
-    private final HttpMethod httpMethod;
-    private final String requestPath;
+    private RequestLine requestLine;
 
-    public HttpRequest(InputStream inputStream) throws IOException {
-        BufferedReader br = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
-        String line = br.readLine();
-        String[] tokens = line.split(" ");
-        log.debug("tokens : {}", tokens);
+    public HttpRequest(InputStream inputStream) {
+        try {
+            BufferedReader br = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+            String line = br.readLine();
+            if (line == null) return;
 
-        this.httpMethod = HttpMethod.valueOf(tokens[0]);
+            requestLine = new RequestLine(line);
 
-        while(!"".equals(line = br.readLine())) {
-            if(line == null) break;
+            while (!"".equals(line = br.readLine())) {
+                if (line == null) break;
 
-            String[] headerTokens = line.split(": ");
-            header.put(headerTokens[0], headerTokens[1]);
-        }
+                String[] headerTokens = line.split(": ");
+                header.put(headerTokens[0].trim(), headerTokens[1].trim());
+            }
 
-        if(httpMethod.isPost()) {
-            this.requestPath = tokens[1];
-
-            String body = IOUtils.readData(br, Integer.parseInt(getHeader("Content-Length")));
-            parameter = HttpRequestUtils.parseQueryString(body);
-        } else {
-            int idx = tokens[1].indexOf("?");
-            this.requestPath = tokens[1].substring(0, idx);
-
-            String queryString = tokens[1].substring(idx + 1);
-            parameter = HttpRequestUtils.parseQueryString(queryString);
+            if (getMethod().isPost()) {
+                String body = IOUtils.readData(br, Integer.parseInt(getHeader("Content-Length")));
+                parameter = HttpRequestUtils.parseQueryString(body);
+            } else {
+                parameter = requestLine.getParams();
+            }
+        } catch (IOException e) {
+            log.error(e.getMessage());
         }
     }
 
-    public String getMethod() {
-        return this.httpMethod.name();
+    public HttpMethod getMethod() {
+        return requestLine.getMethod();
     }
 
     public String getPath() {
-        return this.requestPath;
+        return requestLine.getPath();
     }
 
     public String getHeader(String key) {
