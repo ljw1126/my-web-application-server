@@ -2,6 +2,7 @@ package http;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import util.HttpRequestUtils;
 
 import java.util.Map;
 
@@ -27,7 +28,7 @@ class RequestLineTest {
         assertThat(requestLine.getMethod()).isEqualTo(HttpMethod.GET);
         assertThat(requestLine.getPath()).isEqualTo("/user/create");
 
-        Map<String, String> params = requestLine.getParams();
+        Map<String, String> params = HttpRequestUtils.parseQueryString(requestLine.getQueryString());
         assertThat(params.size()).isEqualTo(3);
     }
 }
