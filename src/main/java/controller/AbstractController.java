@@ -1,8 +1,8 @@
 package controller;
 
-import webserver.HttpMethod;
-import webserver.HttpRequest;
-import webserver.HttpResponse;
+import http.HttpMethod;
+import http.HttpRequest;
+import http.HttpResponse;
 
 public abstract class AbstractController implements Controller {
     @Override
