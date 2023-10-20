@@ -12,7 +12,7 @@ public class RequestLine {
 
     private HttpMethod method;
     private String path;
-    private Map<String, String> params = new HashMap<>();
+    private String queryString;
 
     public RequestLine(String requestLine) {
         log.debug("request line : {}", requestLine);
@@ -28,9 +28,7 @@ public class RequestLine {
             path = tokens[1];
         } else {
             path = tokens[1].substring(0, idx);
-
-            String queryString = tokens[1].substring(idx + 1);
-            params = HttpRequestUtils.parseQueryString(queryString);
+            queryString = tokens[1].substring(idx + 1);
         }
     }
 
@@ -42,7 +40,7 @@ public class RequestLine {
         return path;
     }
 
-    public Map<String, String> getParams() {
-        return params;
+    public String getQueryString() {
+        return queryString;
     }
 }
