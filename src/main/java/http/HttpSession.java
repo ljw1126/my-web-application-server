@@ -6,7 +6,7 @@ import java.util.UUID;
 
 //p196
 public class HttpSession {
-    private static Map<String, Object> values = new HashMap<>(); // 각 세션별 개별 생성
+    private Map<String, Object> values = new HashMap<>(); // 각 세션별 개별 생성
 
     private String id;
     public HttpSession(String id) {
